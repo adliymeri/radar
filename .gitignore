@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.pytest_cache/
+*.egg-info/
+dist/
+build/
+
+# Virtual environment
+radar-env/
+venv/
+.env/
+
+# Environment variables — NEVER commit this
+.env
+
+# Logs
+*.log
+logs/
+
+# IDE
+.idea/
+.vscode/
+*.DS_Store

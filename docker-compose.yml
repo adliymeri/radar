@@ -1,0 +1,22 @@
+networks:
+  radar_network:
+
+services:
+  postgres:
+    image: postgres:17.4-alpine3.21
+    environment:
+      TZ: "UTC"
+      PGTZ: "UTC"
+      POSTGRES_USER: root
+      POSTGRES_PASSWORD: radarapp2025
+      POSTGRES_DB: radar
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./src/infrastructure/db/migrations:/docker-entrypoint-initdb.d
+    networks:
+      - radar_network
+
+volumes:
+  db_data:
