@@ -34,11 +34,6 @@ def main():
         app_log.info("Bot interrupted by user.")
     finally:
         app_log.info("Bot offline.")
-        loop = asyncio.new_event_loop()
-        loop.run_until_complete(shutdown_db())
-        app_log.info("Database connections closed.")
-        loop.close()
-
-
+        
 if __name__ == "__main__":
     main()

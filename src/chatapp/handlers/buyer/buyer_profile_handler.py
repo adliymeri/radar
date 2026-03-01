@@ -1,6 +1,6 @@
 from uuid import UUID
 from telegram import Update, InlineKeyboardMarkup, InlineKeyboardButton
-from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, CommandHandler, filters
+from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CallbackQueryHandler, filters
 from src.chatapp.keyboards.buyer_menu import get_buyer_menu_keyboard
 from src.chatapp.dependency_injection.dependency_injection import get_bot_deps
 from src.infrastructure.utils.logs import app_log
@@ -8,10 +8,10 @@ from src.infrastructure.utils.logs import app_log
 
 def format_request_line(request, index: int) -> str:
     d = request.details
-    colors = ", ".join(d.get("color", [])) if isinstance(d.get("color"), list) else d.get("color", "N/A")
+    year_range = f"{d.get('year_min', 'N/A')} — {d.get('year_max', 'N/A')}"
     return (
         f"{index}️⃣ {d.get('make', 'N/A')} {d.get('model', 'N/A')} "
-        f"— {d.get('year', 'N/A')} — {colors}"
+        f"— {year_range}"
     )
 
 
