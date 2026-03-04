@@ -1,6 +1,8 @@
 import asyncio
 import os
 from telegram.ext import ApplicationBuilder
+from src.chatapp.handlers.buyer.pause_resume_handler import get_pause_resume_handlers
+from src.chatapp.handlers.buyer.contact_seller_handler import get_contact_seller_handler
 from src.chatapp.handlers.buyer.buyer_profile_handler import get_buyer_profile_handler
 from src.chatapp.handlers.seller.seller_car_listing_handler import get_seller_car_listing_conv
 from src.chatapp.handlers.registration_handler import get_registration_conv
@@ -24,8 +26,12 @@ def main():
     application.add_handler(get_registration_conv())
     application.add_handler(get_car_request_conv())
     application.add_handler(get_seller_car_listing_conv())
+    application.add_handler(get_contact_seller_handler())
     
     for handler in get_buyer_profile_handler():
+        application.add_handler(handler)
+
+    for handler in get_pause_resume_handlers():
         application.add_handler(handler)
 
     try:

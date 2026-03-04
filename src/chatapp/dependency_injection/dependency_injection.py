@@ -9,13 +9,14 @@ from src.infrastructure.db.postgres import get_session
 from src.infrastructure.repositories.postgres_seller_repository import PostgresSellerRepository
 from src.infrastructure.repositories.postgres_buyer_repository import PostgresBuyerRepository
 from src.infrastructure.repositories.postgres_buyer_request_repository import PostgresBuyerRequestRepository
+from src.infrastructure.repositories.postgres_match_repository import PostgresMatchRepository
 
 
 # Services
 from src.application.services.seller_service import SellerService
 from src.application.services.buyer_service import BuyerService
 from src.application.services.buyer_request_service import BuyerRequestService
-
+from src.application.services.matching_service import MatchingService
 
 class BotDependencyManager:
     """
@@ -36,6 +37,7 @@ class BotDependencyManager:
         buyer_request_repo = PostgresBuyerRequestRepository(self.session)
         listing_repo = PostgresListingRepository(self.session)
         car_listing_repo = PostgresCarListingRepository(self.session)
+        match_repo = PostgresMatchRepository(self.session)
         
 
         # 3. Initialize Services
@@ -44,7 +46,7 @@ class BotDependencyManager:
         buyer_request_service = BuyerRequestService(buyer_request_repo)
         listing_service = ListingService(listing_repo)
         car_listing_service = CarListingService(car_listing_repo)
-
+        match_service = MatchingService(self.session, match_repo)
         
 
         
@@ -54,6 +56,7 @@ class BotDependencyManager:
             "buyer_request_service": buyer_request_service,
             "listing_service": listing_service,
             "car_listing_service": car_listing_service,
+            "match_service": match_service,
         }
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
