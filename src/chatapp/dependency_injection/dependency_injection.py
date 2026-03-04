@@ -46,7 +46,7 @@ class BotDependencyManager:
         buyer_request_service = BuyerRequestService(buyer_request_repo)
         listing_service = ListingService(listing_repo)
         car_listing_service = CarListingService(car_listing_repo)
-        match_service = MatchingService(self.session, match_repo)
+        matching_service = MatchingService(self.session, match_repo)
         
 
         
@@ -56,7 +56,7 @@ class BotDependencyManager:
             "buyer_request_service": buyer_request_service,
             "listing_service": listing_service,
             "car_listing_service": car_listing_service,
-            "match_service": match_service,
+            "matching_service": matching_service,
         }
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):

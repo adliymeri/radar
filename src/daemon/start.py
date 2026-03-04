@@ -1,6 +1,6 @@
 import asyncio
 import os
-from datetime import datetime
+from datetime import datetime, timezone
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.infrastructure.db.postgres import async_session
 from src.infrastructure.repositories.postgres_match_repository import PostgresMatchRepository
@@ -11,9 +11,21 @@ from src.infrastructure.utils.logs import setup_logging, app_log
 setup_logging("daemon_logs")
 
 
+# Global state for last run timestamp
+last_run_time = None
+
+
 async def run_matching_cycle():
     """Single matching cycle - finds matches and publishes to RabbitMQ"""
-    app_log.info("Starting matching cycle")
+    global last_run_time
+    
+    cycle_start = datetime.now(timezone.utc)
+    app_log.info(f"Starting matching cycle at {cycle_start}")
+    
+    if last_run_time:
+        app_log.info(f"Incremental mode: checking listings since {last_run_time}")
+    else:
+        app_log.info("Full mode: checking all listings (first run)")
     
     rabbitmq = RabbitMQClient()
     await rabbitmq.connect()
@@ -22,12 +34,13 @@ async def run_matching_cycle():
         match_repo = PostgresMatchRepository(session)
         matching_service = MatchingService(session, match_repo)
 
-        # Find all matches
-        matches = await matching_service.find_matches()
+        # Find matches with incremental filtering
+        matches = await matching_service.find_matches(last_run=last_run_time)
 
         if not matches:
             app_log.info("No new matches found")
             await rabbitmq.close()
+            last_run_time = cycle_start
             return
 
         # Save matches to DB and publish notifications
@@ -50,7 +63,12 @@ async def run_matching_cycle():
         app_log.info(f"Published {len(matches)} matches to RabbitMQ")
 
     await rabbitmq.close()
-    app_log.info("Matching cycle complete")
+    
+    # Update last run timestamp
+    last_run_time = cycle_start
+    
+    cycle_duration = (datetime.now(timezone.utc) - cycle_start).total_seconds()
+    app_log.info(f"Matching cycle complete in {cycle_duration:.2f} seconds")
 
 
 async def daemon_loop():

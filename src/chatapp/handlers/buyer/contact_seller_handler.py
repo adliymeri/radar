@@ -13,27 +13,18 @@ async def handle_contact_seller(update: Update, context: ContextTypes.DEFAULT_TY
     match_id = UUID(query.data.split(":")[1])
 
     async with get_bot_deps() as deps:
-        match_service = deps["match_service"]
+        matching_service = deps["matching_service"]  # changed
         buyer_service = deps["buyer_service"]
         seller_service = deps["seller_service"]
 
         # Mark match as contacted
-        await match_service.mark_as_contacted(match_id)
+        await matching_service.mark_as_contacted(match_id)  # changed
 
         # Get match details
-        match = await match_service.get_match_by_id(match_id)
+        match = await matching_service.get_match_by_id(match_id)  # changed
         buyer = await buyer_service.get_buyer_by_id(match.buyer_id)
         seller = await seller_service.get_seller_by_id(match.seller_id)
 
-        buyer_chat_id = buyer.details["chat_id"]
-        seller_chat_id = seller.details["chat_id"]
-
-        # Create group chat
-        bot = context.bot
-        chat = await bot.create_chat_invite_link(buyer_chat_id)  # This won't work as expected
-        
-        # WORKAROUND: Telegram doesn't allow bots to create direct user-to-user chats
-        # Best approach: Send seller contact info to buyer
         seller_handle = seller.details.get("telegram_handle", "N/A")
         seller_phone = seller.details.get("mobile_phone", "Not shared")
 

@@ -1,10 +1,12 @@
 from abc import ABC, abstractmethod
-from typing import List
+from typing import List, Optional
+from uuid import UUID
+from datetime import datetime
 from src.domain.models.match import Match
 
 class IMatchingService(ABC):
     @abstractmethod
-    async def find_matches(self) -> List[Match]:
+    async def find_matches(self, last_run: Optional[datetime] = None) -> List[Match]:
         """Find all new matches between active buyer requests and listings"""
         pass
 
@@ -13,5 +15,9 @@ class IMatchingService(ABC):
         pass
 
     @abstractmethod
-    async def mark_as_contacted(self, match_id) -> None:
+    async def get_match_by_id(self, match_id: UUID) -> Optional[Match]:
+        pass
+
+    @abstractmethod
+    async def mark_as_contacted(self, match_id: UUID) -> None:
         pass

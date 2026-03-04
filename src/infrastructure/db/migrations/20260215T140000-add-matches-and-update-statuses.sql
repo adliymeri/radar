@@ -7,7 +7,7 @@ ALTER TABLE buyer_requests DROP CONSTRAINT IF EXISTS buyer_requests_status_check
 -- Add new constraint with additional statuses
 ALTER TABLE buyer_requests
 ADD CONSTRAINT buyer_requests_status_check 
-CHECK (status IN ('pending', 'active', 'paused', 'matched', 'fulfilled', 'cancelled'));
+CHECK (status IN ('active', 'paused', 'matched'));
 
 -- Set default to 'active' instead of 'pending'
 ALTER TABLE buyer_requests ALTER COLUMN status SET DEFAULT 'active';

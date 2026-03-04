@@ -12,6 +12,7 @@ class ListingORM(Base):
         ForeignKey("sellers.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
     )
-    type = Column(String(50), nullable=False)  # 'car', 'real_estate', 'other'
+    type = Column(String(50), nullable=False)
     created_at = Column(TIMESTAMP(timezone=True), server_default="CURRENT_TIMESTAMP")
     updated_at = Column(TIMESTAMP(timezone=True), server_default="CURRENT_TIMESTAMP")
+    last_matched_at = Column(TIMESTAMP(timezone=True), nullable=True)

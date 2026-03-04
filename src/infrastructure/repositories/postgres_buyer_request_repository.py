@@ -17,7 +17,7 @@ class PostgresBuyerRequestRepository(BuyerRequestRepository):
             type=request.type,
             details=request.details,
             status=request.status,
-            matched_listing_id=request.matched_listing.id if request.matched_listing else None
+            matched_listing_ids=request.matched_listing_ids or []
         )
         self.session.add(orm)
         await self.session.commit()
@@ -35,7 +35,7 @@ class PostgresBuyerRequestRepository(BuyerRequestRepository):
             type=orm.type,
             details=orm.details,
             status=orm.status,
-            matched_listing=None,  # optional: load listing separately
+            matched_listing_ids=orm.matched_listing_ids or [],
             created_at=orm.created_at,
             updated_at=orm.updated_at
         )
@@ -49,7 +49,7 @@ class PostgresBuyerRequestRepository(BuyerRequestRepository):
                 type=orm.type,
                 details=orm.details,
                 status=orm.status,
-                matched_listing=None,
+                matched_listing_ids=orm.matched_listing_ids or [],
                 created_at=orm.created_at,
                 updated_at=orm.updated_at
             )
@@ -65,7 +65,7 @@ class PostgresBuyerRequestRepository(BuyerRequestRepository):
                 type=orm.type,
                 details=orm.details,
                 status=orm.status,
-                matched_listing=None,
+                matched_listing_ids=orm.matched_listing_ids or [],
                 created_at=orm.created_at,
                 updated_at=orm.updated_at
             )
@@ -80,7 +80,7 @@ class PostgresBuyerRequestRepository(BuyerRequestRepository):
                 type=request.type,
                 details=request.details,
                 status=request.status,
-                matched_listing_id=request.matched_listing.id if request.matched_listing else None
+                matched_listing_ids=request.matched_listing_ids or []
             )
         )
         await self.session.commit()

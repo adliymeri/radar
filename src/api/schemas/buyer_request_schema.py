@@ -1,6 +1,6 @@
 from datetime import datetime
 from uuid import UUID
-from typing import Optional, Union, Annotated
+from typing import List, Optional, Union, Annotated
 from pydantic import BaseModel, ConfigDict, Field
 from src.api.schemas.car_request_schema import CarRequestDetailsSchema
 from src.api.schemas.real_estate_listing_schema import RealEstateListingDetailsSchema
@@ -30,6 +30,6 @@ class BuyerRequestResponse(BaseModel):
     type: str
     details: dict
     status: str
-    matched_listing: Optional[dict] = None
+    matched_listing_ids: List[UUID] = []
     created_at: datetime
     updated_at: datetime

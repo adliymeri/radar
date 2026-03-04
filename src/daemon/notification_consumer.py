@@ -39,20 +39,27 @@ async def send_buyer_notification(data: dict):
 
         chat_id = buyer.details["chat_id"]
 
-        # Build message
-        message = (
-            f"🎉 New Match Found!\n\n"
-            f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})\n"
-            f"💶 €{car_listing.price:,.0f}\n"
-            f"🛣 {car_listing.mileage:,} km\n"
-            f"⚙️ {car_listing.transmission} | {car_listing.fuel_type} | {car_listing.drivetrain}\n"
-            f"📍 {car_listing.location or 'Location not specified'}\n"
-        )
+        # Build message with ALL fields
+        message_lines = [
+            "🎉 New Match Found!\n",
+            f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})",
+            f"💶 €{car_listing.price:,.0f}" if car_listing.price else "💶 Price: N/A",
+            f"🛣 {car_listing.mileage:,} km" if car_listing.mileage else "🛣 Mileage: N/A",
+            f"📍 {car_listing.location or 'Location not specified'}",
+            f"⚙️ {car_listing.transmission or 'N/A'} | {car_listing.fuel_type or 'N/A'} | {car_listing.drivetrain or 'N/A'}",
+            f"🎨 Color: {', '.join(car_listing.color) if car_listing.color else 'N/A'}",
+        ]
 
         if car_listing.description:
-            # Truncate if too long
-            desc = car_listing.description[:200] + "..." if len(car_listing.description) > 200 else car_listing.description
-            message += f"\n📝 {desc}\n"
+            desc = car_listing.description.strip()
+            if len(desc) > 300:
+                desc = desc[:300] + "..."
+            message_lines.append(f"📝 {desc}")
+
+        if car_listing.link:
+            message_lines.append(f"🔗 {car_listing.link}")
+
+        message = "\n".join(message_lines)
 
         # Inline button to contact seller
         keyboard = InlineKeyboardMarkup([
