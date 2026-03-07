@@ -1,5 +1,6 @@
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CommandHandler, filters
+from src.domain.config.limits import get_max_requests_for_buyer
 from src.chatapp.handlers.buyer.buyer_error_handler import error_exit
 from src.chatapp.handlers.buyer.buyer_cancel_handler import cancel_handler
 from src.domain.enums.car_enums import (
@@ -51,6 +52,35 @@ def build_multi_select_keyboard(enum_class, selected: list, label: str = "") -> 
 # ================= START =================
 
 async def start_car_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_user.id)
+    
+    # NEW: Check request limit before starting
+    async with get_bot_deps() as deps:
+        buyer_service = deps["buyer_service"]
+        request_service = deps["buyer_request_service"]
+
+        buyer = await buyer_service.get_buyer_by_chat_id(chat_id)
+        if not buyer:
+            await update.message.reply_text("⚠️ You need to register first. Use /start.")
+            return ConversationHandler.END
+
+        # Get max requests based on buyer's payment plan
+        max_requests = get_max_requests_for_buyer(buyer.payment)
+        existing_requests = await request_service.get_requests_by_buyer(buyer.id)
+        
+        if len(existing_requests) >= max_requests:
+            # Get plan name for message
+            plan = buyer.payment.get("plan", "free") if buyer.payment else "free"
+            
+            await update.message.reply_text(
+                f"⚠️ You've reached the maximum of {max_requests} active requests for your {plan} plan.\n\n"
+                f"Delete an existing request from 📄 My Requests to add a new one, "
+                f"or upgrade your plan for more requests.",
+                reply_markup=get_buyer_menu_keyboard()
+            )
+            return ConversationHandler.END
+    
+    # Continue with existing flow
     context.user_data["request"] = {}
     keyboard = with_cancel([[b.value] for b in CarBrand])
     await update.message.reply_text(
@@ -58,6 +88,7 @@ async def start_car_request(update: Update, context: ContextTypes.DEFAULT_TYPE):
         reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
     )
     return SELECT_MAKE
+
 
 
 # ================= MAKE =================

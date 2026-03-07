@@ -121,3 +121,33 @@ class PostgresMatchRepository(MatchRepository):
         orm.updated_at = datetime.now(timezone.utc)
         
         await self.session.commit()
+
+    async def get_matches_by_request(self, request_id: UUID, limit: Optional[int] = None, offset: int = 0) -> List[Match]:
+        query = select(MatchORM).where(MatchORM.request_id == request_id).order_by(MatchORM.notified_at.desc())
+        
+        if limit:
+            query = query.limit(limit).offset(offset)
+        
+        result = await self.session.execute(query)
+        return [
+            Match(
+                id=orm.id,
+                buyer_id=orm.buyer_id,
+                seller_id=orm.seller_id,
+                listing_id=orm.listing_id,
+                request_id=orm.request_id,
+                status=orm.status,
+                notified_at=orm.notified_at,
+                contacted_at=orm.contacted_at,
+                created_at=orm.created_at,
+                updated_at=orm.updated_at,
+            )
+            for orm in result.scalars().all()
+        ]
+
+    async def count_matches_by_request(self, request_id: UUID) -> int:
+        from sqlalchemy import func
+        result = await self.session.execute(
+            select(func.count(MatchORM.id)).where(MatchORM.request_id == request_id)
+        )
+        return result.scalar()

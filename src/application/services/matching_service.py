@@ -18,15 +18,8 @@ class MatchingService(IMatchingService):
         self.match_repository = match_repository
 
     async def find_matches(self, last_run: Optional[datetime] = None) -> List[Match]:
-        """
-        Find matches using incremental approach - only check new/updated listings.
-        
-        Args:
-            last_run: Timestamp of last matching cycle. If None, matches all listings.
-        """
         matches = []
 
-        # Fetch all active car requests
         result = await self.session.execute(
             select(BuyerRequestORM).where(
                 and_(
@@ -41,7 +34,7 @@ class MatchingService(IMatchingService):
             app_log.info("No active buyer requests found")
             return matches
 
-        # Build incremental filter
+        
         listing_filter = [ListingORM.type == "car"]
         
         if last_run:
@@ -49,11 +42,11 @@ class MatchingService(IMatchingService):
                 or_(
                     ListingORM.created_at > last_run,
                     ListingORM.updated_at > last_run,
-                    ListingORM.last_matched_at.is_(None)
+                    ListingORM.last_matched_at.is_(None),
+                    ListingORM.last_matched_at < last_run
                 )
             )
 
-        # Fetch car listings with incremental filter
         result = await self.session.execute(
             select(CarListingORM, ListingORM).join(
                 ListingORM, CarListingORM.listing_id == ListingORM.id
@@ -65,19 +58,37 @@ class MatchingService(IMatchingService):
             app_log.info("No new/updated car listings found")
             return matches
 
+        
+        request_ids = [r.id for r in requests]
+        listing_ids = [listing_orm.id for _, listing_orm in listings_data]
+        
+        from src.infrastructure.db.orm_models.match_orm import MatchORM
+        result = await self.session.execute(
+            select(MatchORM.listing_id, MatchORM.request_id).where(
+                and_(
+                    MatchORM.request_id.in_(request_ids),
+                    MatchORM.listing_id.in_(listing_ids)
+                )
+            )
+        )
+        
+        existing_matches = set((row[0], row[1]) for row in result.all())
+        memory_mb = len(existing_matches) * 40 / (1024 * 1024)  # Estimate
+        app_log.info(f"Loaded {len(existing_matches)} existing matches into memory (~{memory_mb:.1f} MB)")
+        
+
         app_log.info(
             f"Incremental matching: {len(requests)} requests against "
             f"{len(listings_data)} new/updated listings"
         )
 
-        # Match each request against filtered listings
         for request_orm in requests:
             matched_count = 0
             
             for car_listing_orm, listing_orm in listings_data:
-                if await self.match_repository.match_exists(listing_orm.id, request_orm.id):
+                if (listing_orm.id, request_orm.id) in existing_matches:
                     continue
-
+                
                 if self._quick_filter(request_orm.details, car_listing_orm):
                     if self._detailed_match(request_orm.details, car_listing_orm):
                         match = Match(
@@ -90,15 +101,22 @@ class MatchingService(IMatchingService):
                         matches.append(match)
                         matched_count += 1
 
+                        if request_orm.matched_listing_ids is None:
+                            request_orm.matched_listing_ids = []
+                        
                         if listing_orm.id not in request_orm.matched_listing_ids:
                             request_orm.matched_listing_ids.append(listing_orm.id)
+                        
+                        existing_matches.add((listing_orm.id, request_orm.id))
+                        
 
             if matched_count > 0:
                 app_log.info(f"Request {request_orm.id}: {matched_count} new matches")
 
-        # Update last_matched_at for all checked listings
         for _, listing_orm in listings_data:
             listing_orm.last_matched_at = datetime.now(timezone.utc)
+        
+        await self.session.flush()
         
         await self.session.commit()
 
@@ -174,4 +192,18 @@ class MatchingService(IMatchingService):
             await self.match_repository.mark_as_contacted(match_id)
         except Exception as e:
             app_log.error(f"Error marking match {match_id} as contacted: {e}")
+            raise
+    
+    async def get_matches_by_request(self, request_id: UUID, limit: Optional[int] = None, offset: int = 0) -> List[Match]:
+        try:
+            return await self.match_repository.get_matches_by_request(request_id, limit, offset)
+        except Exception as e:
+            app_log.error(f"Error fetching matches for request {request_id}: {e}")
+            raise
+
+    async def count_matches_by_request(self, request_id: UUID) -> int:
+        try:
+            return await self.match_repository.count_matches_by_request(request_id)
+        except Exception as e:
+            app_log.error(f"Error counting matches for request {request_id}: {e}")
             raise
