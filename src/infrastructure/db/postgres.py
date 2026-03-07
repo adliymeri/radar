@@ -7,20 +7,25 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-# Load environment variables
 DB_USER = os.getenv("POSTGRES_USER")
 DB_PASSWORD = os.getenv("POSTGRES_PASSWORD")
 DB_NAME = os.getenv("POSTGRES_DB")
 DB_HOST = os.getenv("POSTGRES_HOST")
 DB_PORT = os.getenv("POSTGRES_PORT")
 
-# Async connection URL
 DATABASE_URL = f"postgresql+asyncpg://{DB_USER}:{DB_PASSWORD}@{DB_HOST}:{DB_PORT}/{DB_NAME}"
 
-# Create engine and session
-engine = create_async_engine(DATABASE_URL, echo=False, future=True)
-async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
+engine = create_async_engine(
+    DATABASE_URL,
+    echo=False,
+    future=True,
+    pool_size=20,
+    max_overflow=40,
+    pool_pre_ping=True,
+    pool_recycle=3600,
+)
 
+async_session = async_sessionmaker(engine, expire_on_commit=False, class_=AsyncSession)
 
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     session = async_session()
@@ -29,7 +34,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
     finally:
         await session.close()
 
-# Shutdown helper
+
 async def shutdown_db():
     """Dispose the engine and close all connections."""
     await engine.dispose()

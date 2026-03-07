@@ -31,3 +31,11 @@ class MatchRepository(ABC):
     @abstractmethod
     async def mark_as_contacted(self, match_id: UUID) -> None:
         pass
+
+    @abstractmethod
+    async def get_matches_by_request(self, request_id: UUID, limit: Optional[int] = None, offset: int = 0) -> List[Match]:
+        pass
+
+    @abstractmethod
+    async def count_matches_by_request(self, request_id: UUID) -> int:
+        pass

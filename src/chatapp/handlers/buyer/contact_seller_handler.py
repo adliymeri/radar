@@ -35,7 +35,18 @@ async def handle_contact_seller(update: Update, context: ContextTypes.DEFAULT_TY
             f"Feel free to reach out directly!"
         )
 
-        await query.edit_message_text(message)
+        original_text = query.message.text
+
+        new_text = (
+            original_text +
+            "\n\n"
+            "✅ Seller Contact Information:\n\n"
+            f"📱 Telegram: @{seller_handle}\n"
+            f"📞 Phone: {seller_phone}\n\n"
+            "Feel free to reach out directly!"
+        )
+
+        await query.edit_message_text(new_text)
         app_log.info(f"Match {match_id} marked as contacted")
 
 
