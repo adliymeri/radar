@@ -1,10 +1,12 @@
+from datetime import datetime, timezone  # CHANGED: Correct import
 from typing import List, Optional, Union
 from uuid import UUID
-from sqlalchemy import select, update, delete
+from sqlalchemy import select, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.domain.models.seller import Seller
 from src.domain.repositories.seller_repository import SellerRepository
 from src.infrastructure.db.orm_models.seller_orm import SellerORM
+
 
 class PostgresSellerRepository(SellerRepository):
     def __init__(self, session: AsyncSession):
@@ -67,16 +69,31 @@ class PostgresSellerRepository(SellerRepository):
         return sellers
 
     async def update_seller(self, seller: Seller) -> Seller:
-        await self.session.execute(
-            update(SellerORM)
-            .where(SellerORM.id == seller.id)
-            .values(
-                details=seller.details,
-                payment=seller.payment,
-            )
+        """Update existing seller"""
+        result = await self.session.execute(
+            select(SellerORM).where(SellerORM.id == seller.id)
         )
+        seller_orm = result.scalar_one_or_none()
+        
+        if not seller_orm:
+            raise ValueError(f"Seller {seller.id} not found")
+        
+        # Update fields
+        seller_orm.details = seller.details
+        seller_orm.payment = seller.payment
+        seller_orm.updated_at = datetime.now(timezone.utc)  # CHANGED: Correct usage
+        
         await self.session.commit()
-        return seller
+        await self.session.refresh(seller_orm)
+        
+        # Return domain model
+        return Seller(
+            id=seller_orm.id,
+            details=seller_orm.details,
+            payment=seller_orm.payment,
+            created_at=seller_orm.created_at,
+            updated_at=seller_orm.updated_at,
+        )
 
     async def delete_sellers(self, seller_ids: Union[UUID, List[UUID]]) -> None:
         if isinstance(seller_ids, UUID):

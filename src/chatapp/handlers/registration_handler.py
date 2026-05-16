@@ -171,6 +171,7 @@ async def _finish_buyer_registration(update: Update, context: ContextTypes.DEFAU
             await update.message.reply_text("❌ Failed to save. Please contact support.")
 
     context.user_data.clear()
+    context.user_data["current_role"] = "buyer"
     return ConversationHandler.END
 
 
@@ -206,6 +207,7 @@ async def _finish_seller_registration(update: Update, context: ContextTypes.DEFA
             await update.message.reply_text("❌ Failed to save. Please contact support.")
 
     context.user_data.clear()
+    context.user_data["current_role"] = "seller"
     return ConversationHandler.END
 
 

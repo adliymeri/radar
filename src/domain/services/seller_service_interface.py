@@ -23,3 +23,8 @@ class ISellerService(ABC):
     @abstractmethod
     async def delete_sellers(self, seller_ids: Union[UUID, List[UUID]]) -> None:
         pass
+
+    @abstractmethod
+    async def update_seller(self, seller: Seller) -> Seller:
+        """Update seller"""
+        pass

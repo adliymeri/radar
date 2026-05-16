@@ -31,3 +31,13 @@ class IListingService(ABC):
     @abstractmethod
     async def delete_listings_by_seller(self, seller_id: UUID) -> None:
         pass
+
+    @abstractmethod
+    async def get_listings_by_seller(self, seller_id: UUID) -> List[Listing]:
+        """Get all listings for a seller"""
+        pass
+    
+    @abstractmethod
+    async def delete_listing(self, listing_id: UUID) -> None:
+        """Delete a listing"""
+        pass

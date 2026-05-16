@@ -93,3 +93,26 @@ class PostgresListingRepository(ListingRepository):
             delete(ListingORM).where(ListingORM.seller_id == seller_id)
         )
         await self.session.commit()
+    
+    async def get_listings_by_seller(self, seller_id: UUID) -> List[Listing]:
+        """Get all listings for a seller"""
+        result = await self.session.execute(
+            select(ListingORM)
+            .where(ListingORM.seller_id == seller_id)
+            .order_by(ListingORM.created_at.desc())
+        )
+        listing_orms = result.scalars().all()
+        return [listing_orm.to_domain() for listing_orm in listing_orms]
+
+    async def delete_listing(self, listing_id: UUID) -> None:
+        """Delete a listing"""
+        result = await self.session.execute(
+            select(ListingORM).where(ListingORM.id == listing_id)
+        )
+        listing_orm = result.scalar_one_or_none()
+        
+        if not listing_orm:
+            raise ValueError(f"Listing {listing_id} not found")
+        
+        await self.session.delete(listing_orm)
+        await self.session.commit()
