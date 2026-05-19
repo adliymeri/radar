@@ -466,4 +466,6 @@ def get_car_request_conv():
             CommandHandler("cancel", cancel_handler),
             MessageHandler(cancel_filter, cancel_handler),
         ],
+        persistent=True,
+        name="car_request",
     )

@@ -6,18 +6,52 @@ from src.domain.models.real_estate_listing import RealEstateListing
 from src.domain.repositories.real_estate_listing_repository import RealEstateListingRepository
 from src.infrastructure.db.orm_models.real_estate_listing_orm import RealEstateListingORM
 
+
 class PostgresRealEstateListingRepository(RealEstateListingRepository):
     def __init__(self, session: AsyncSession):
         self.session = session
 
+    def _to_domain(self, orm_obj: RealEstateListingORM) -> RealEstateListing:
+        return RealEstateListing(
+            listing_id=orm_obj.listing_id,
+            property_type=orm_obj.property_type,
+            listing_type=orm_obj.listing_type,
+            condition=orm_obj.condition,
+            city=orm_obj.city,
+            district=orm_obj.district,
+            address=orm_obj.address,
+            area=float(orm_obj.area) if orm_obj.area else 0.0,
+            bedrooms=orm_obj.bedrooms,
+            bathrooms=orm_obj.bathrooms,
+            floor=orm_obj.floor,
+            price=float(orm_obj.price) if orm_obj.price else 0.0,
+            parking=orm_obj.parking,
+            elevator=orm_obj.elevator,
+            furnished=orm_obj.furnished,
+            balcony=orm_obj.balcony,
+            photos=orm_obj.photos or [],
+            link=orm_obj.link,
+            description=orm_obj.description,
+        )
+
     async def create_listing(self, listing: RealEstateListing) -> RealEstateListing:
         listing_orm = RealEstateListingORM(
             listing_id=listing.listing_id,
+            property_type=listing.property_type,
+            listing_type=listing.listing_type,
+            condition=listing.condition,
+            city=listing.city,
+            district=listing.district,
             address=listing.address,
             area=listing.area,
-            rooms=listing.rooms,
+            bedrooms=listing.bedrooms,
+            bathrooms=listing.bathrooms,
+            floor=listing.floor,
             price=listing.price,
-            location=listing.location,
+            parking=listing.parking,
+            elevator=listing.elevator,
+            furnished=listing.furnished,
+            balcony=listing.balcony,
             photos=listing.photos,
             link=listing.link,
             description=listing.description,
@@ -34,52 +68,32 @@ class PostgresRealEstateListingRepository(RealEstateListingRepository):
         orm_obj = result.scalar_one_or_none()
         if not orm_obj:
             return None
-        return RealEstateListing(
-            listing_id=orm_obj.listing_id,
-            address=orm_obj.address,
-            area=orm_obj.area,
-            rooms=orm_obj.rooms,
-            price=orm_obj.price,
-            location=orm_obj.location,
-            photos=orm_obj.photos,
-            link=orm_obj.link,
-            description=orm_obj.description,
-        )
+        return self._to_domain(orm_obj)
 
     async def get_all_listings(self) -> List[RealEstateListing]:
         result = await self.session.execute(select(RealEstateListingORM))
-        listings = []
-        for row in result.scalars().all():
-            listings.append(
-                RealEstateListing(
-                    listing_id=row.listing_id,
-                    address=row.address,
-                    area=row.area,
-                    rooms=row.rooms,
-                    price=row.price,
-                    location=row.location,
-                    photos=row.photos,
-                    link=row.link,
-                    description=row.description,
-                )
-            )
-        return listings
-
-    async def get_listings_by_seller(self, seller_id: UUID) -> List[RealEstateListing]:
-        # Assuming seller_id is stored in the 'listings' table and joined externally
-        # You might need a join query with ListingORM -> RealEstateListingORM
-        raise NotImplementedError("Join with listings table needed to fetch by seller")
+        return [self._to_domain(row) for row in result.scalars().all()]
 
     async def update_listing(self, listing: RealEstateListing) -> RealEstateListing:
         await self.session.execute(
             update(RealEstateListingORM)
             .where(RealEstateListingORM.listing_id == listing.listing_id)
             .values(
+                property_type=listing.property_type,
+                listing_type=listing.listing_type,
+                condition=listing.condition,
+                city=listing.city,
+                district=listing.district,
                 address=listing.address,
                 area=listing.area,
-                rooms=listing.rooms,
+                bedrooms=listing.bedrooms,
+                bathrooms=listing.bathrooms,
+                floor=listing.floor,
                 price=listing.price,
-                location=listing.location,
+                parking=listing.parking,
+                elevator=listing.elevator,
+                furnished=listing.furnished,
+                balcony=listing.balcony,
                 photos=listing.photos,
                 link=listing.link,
                 description=listing.description,
@@ -98,3 +112,13 @@ class PostgresRealEstateListingRepository(RealEstateListingRepository):
             delete(RealEstateListingORM).where(RealEstateListingORM.listing_id.in_(listing_ids))
         )
         await self.session.commit()
+
+    async def get_listings_by_seller(self, seller_id: UUID) -> List[RealEstateListing]:
+        from src.infrastructure.db.orm_models.listing_orm import ListingORM
+        
+        result = await self.session.execute(
+            select(RealEstateListingORM)
+            .join(ListingORM, ListingORM.id == RealEstateListingORM.listing_id)
+            .where(ListingORM.seller_id == seller_id)
+        )
+        return [self._to_domain(row) for row in result.scalars().all()]

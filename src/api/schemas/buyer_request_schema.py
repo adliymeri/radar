@@ -3,10 +3,10 @@ from uuid import UUID
 from typing import List, Optional, Union, Annotated
 from pydantic import BaseModel, ConfigDict, Field
 from src.api.schemas.car_request_schema import CarRequestDetailsSchema
-from src.api.schemas.real_estate_listing_schema import RealEstateListingDetailsSchema
+from src.api.schemas.real_estate_request_schema import RealEstateRequestDetailsSchema
 
 BuyerRequestDetailsSchema = Annotated[
-    Union[CarRequestDetailsSchema, RealEstateListingDetailsSchema],
+    Union[CarRequestDetailsSchema, RealEstateRequestDetailsSchema],
     Field(discriminator="type")
 ]
 

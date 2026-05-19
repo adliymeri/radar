@@ -3,7 +3,6 @@ from datetime import datetime, timezone
 from uuid import UUID, uuid4
 from typing import List
 from src.domain.types.buyer_request_types import BuyerRequestDetails
-from src.domain.models.listing import Listing
 
 @dataclass
 class BuyerRequest:

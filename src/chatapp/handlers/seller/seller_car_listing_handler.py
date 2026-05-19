@@ -361,4 +361,6 @@ def get_seller_car_listing_conv():
             CommandHandler("cancel", cancel_handler),
             MessageHandler(cancel_filter, cancel_handler),
         ],
+        persistent=True,
+        name="car_listing",
     )

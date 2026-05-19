@@ -8,13 +8,13 @@ from src.infrastructure.repositories.postgres_buyer_repository import PostgresBu
 from src.infrastructure.repositories.postgres_seller_repository import PostgresSellerRepository
 from src.infrastructure.repositories.postgres_listing_repository import PostgresListingRepository
 from src.infrastructure.repositories.postgres_car_listing_repository import PostgresCarListingRepository
+from src.infrastructure.repositories.postgres_real_estate_listing_repository import PostgresRealEstateListingRepository
 from src.infrastructure.messaging.rabbitmq_client import RabbitMQClient
 from src.infrastructure.utils.logs import setup_logging, app_log
 
 setup_logging("notification_consumer_logs")
 
-# Telegram rate limiting
-RATE_LIMIT_DELAY = 0.034  # ~30 messages/second
+RATE_LIMIT_DELAY = 0.034
 
 
 async def send_buyer_notification(data: dict):
@@ -27,56 +27,100 @@ async def send_buyer_notification(data: dict):
         buyer_repo = PostgresBuyerRepository(session)
         listing_repo = PostgresListingRepository(session)
         car_listing_repo = PostgresCarListingRepository(session)
+        real_estate_listing_repo = PostgresRealEstateListingRepository(session)
 
-        # Fetch data
         buyer = await buyer_repo.get_buyer_by_id(UUID(data["buyer_id"]))
         listing = await listing_repo.get_listing_by_id(UUID(data["listing_id"]))
-        car_listing = await car_listing_repo.get_car_listing_by_id(UUID(data["listing_id"]))
 
-        if not buyer or not listing or not car_listing:
+        if not buyer or not listing:
             app_log.error(f"Missing data for match {data['match_id']}")
             return
 
         chat_id = buyer.details["chat_id"]
 
-        # Build message with ALL fields
-        message_lines = [
-            "🎉 New Match Found!\n",
-            f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})",
-            f"💶 €{car_listing.price:,.0f}" if car_listing.price else "💶 Price: N/A",
-            f"🛣 {car_listing.mileage:,} km" if car_listing.mileage else "🛣 Mileage: N/A",
-            f"📍 {car_listing.location or 'Location not specified'}",
-            f"⚙️ {car_listing.transmission or 'N/A'} | {car_listing.fuel_type or 'N/A'} | {car_listing.drivetrain or 'N/A'}",
-            f"🎨 Color: {', '.join(car_listing.color) if car_listing.color else 'N/A'}",
-        ]
+        if listing.type == "car":
+            car_listing = await car_listing_repo.get_car_listing_by_id(UUID(data["listing_id"]))
+            if not car_listing:
+                app_log.error(f"Missing car listing for match {data['match_id']}")
+                return
 
-        if car_listing.description:
-            desc = car_listing.description.strip()
-            if len(desc) > 300:
-                desc = desc[:300] + "..."
-            message_lines.append(f"📝 {desc}")
+            message_lines = [
+                "🎉 New Match Found!\n",
+                f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})",
+                f"💶 €{car_listing.price:,.0f}" if car_listing.price else "💶 Price: N/A",
+                f"🛣 {car_listing.mileage:,} km" if car_listing.mileage else "🛣 Mileage: N/A",
+                f"📍 {car_listing.location or 'Location not specified'}",
+                f"⚙️ {car_listing.transmission or 'N/A'} | {car_listing.fuel_type or 'N/A'} | {car_listing.drivetrain or 'N/A'}",
+                f"🎨 Color: {', '.join(car_listing.color) if car_listing.color else 'N/A'}",
+            ]
 
-        if car_listing.link:
-            message_lines.append(f"🔗 {car_listing.link}")
+            if car_listing.description:
+                desc = car_listing.description[:300] + "..." if len(car_listing.description) > 300 else car_listing.description
+                message_lines.append(f"📝 {desc}")
+
+            if car_listing.link:
+                message_lines.append(f"🔗 {car_listing.link}")
+
+            photos = car_listing.photos
+
+        elif listing.type == "real_estate":
+            re_listing = await real_estate_listing_repo.get_listing_by_id(UUID(data["listing_id"]))
+            if not re_listing:
+                app_log.error(f"Missing real estate listing for match {data['match_id']}")
+                return
+
+            features = []
+            if re_listing.parking:
+                features.append("🅿️ Parking")
+            if re_listing.elevator:
+                features.append("🛗 Elevator")
+            if re_listing.furnished:
+                features.append("🛋 Furnished")
+            if re_listing.balcony:
+                features.append("🏞 Balcony")
+
+            message_lines = [
+                "🎉 New Match Found!\n",
+                f"🏠 {re_listing.property_type} — {re_listing.listing_type}",
+                f"🏗 {re_listing.condition}",
+                f"📍 {re_listing.district}, {re_listing.city}",
+                f"📫 {re_listing.address}",
+                f"💶 €{re_listing.price:,.0f}",
+                f"📐 {re_listing.area:.0f} m²",
+                f"🛏 {re_listing.bedrooms} bedrooms | 🚿 {re_listing.bathrooms} bathrooms",
+                f"🏢 Floor {re_listing.floor}",
+            ]
+
+            if features:
+                message_lines.append(f"✅ {', '.join(features)}")
+
+            if re_listing.description:
+                desc = re_listing.description[:300] + "..." if len(re_listing.description) > 300 else re_listing.description
+                message_lines.append(f"📝 {desc}")
+
+            if re_listing.link:
+                message_lines.append(f"🔗 {re_listing.link}")
+
+            photos = re_listing.photos
+
+        else:
+            app_log.error(f"Unknown listing type for match {data['match_id']}")
+            return
 
         message = "\n".join(message_lines)
 
-        # Inline button to contact seller
         keyboard = InlineKeyboardMarkup([
             [InlineKeyboardButton("📞 Contact Seller", callback_data=f"contact_seller:{data['match_id']}")]
         ])
 
-        # Send message
         await bot.send_message(chat_id=chat_id, text=message, reply_markup=keyboard)
 
-        # Send photos if available
-        if car_listing.photos and len(car_listing.photos) > 0:
-            media_group = [InputMediaPhoto(photo_id) for photo_id in car_listing.photos[:10]]  # Max 10
+        if photos and len(photos) > 0:
+            media_group = [InputMediaPhoto(photo_id) for photo_id in photos[:10]]
             await bot.send_media_group(chat_id=chat_id, media=media_group)
 
         app_log.info(f"Buyer notification sent for match {data['match_id']}")
 
-    # Rate limiting
     await asyncio.sleep(RATE_LIMIT_DELAY)
 
 
@@ -88,28 +132,48 @@ async def send_seller_notification(data: dict):
 
     async with async_session() as session:
         seller_repo = PostgresSellerRepository(session)
+        listing_repo = PostgresListingRepository(session)
         car_listing_repo = PostgresCarListingRepository(session)
+        real_estate_listing_repo = PostgresRealEstateListingRepository(session)
 
         seller = await seller_repo.get_seller_by_id(UUID(data["seller_id"]))
-        car_listing = await car_listing_repo.get_car_listing_by_id(UUID(data["listing_id"]))
+        listing = await listing_repo.get_listing_by_id(UUID(data["listing_id"]))
 
-        if not seller or not car_listing:
+        if not seller or not listing:
             app_log.error(f"Missing data for match {data['match_id']}")
             return
 
         chat_id = seller.details["chat_id"]
 
-        message = (
-            f"👀 Interest in Your Listing!\n\n"
-            f"Someone is interested in your:\n"
-            f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})\n\n"
-            f"They may contact you soon!"
-        )
+        if listing.type == "car":
+            car_listing = await car_listing_repo.get_car_listing_by_id(UUID(data["listing_id"]))
+            if not car_listing:
+                return
+            message = (
+                f"👀 Interest in Your Listing!\n\n"
+                f"Someone is interested in your:\n"
+                f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})\n\n"
+                f"They may contact you soon!"
+            )
+
+        elif listing.type == "real_estate":
+            re_listing = await real_estate_listing_repo.get_listing_by_id(UUID(data["listing_id"]))
+            if not re_listing:
+                return
+            message = (
+                f"👀 Interest in Your Listing!\n\n"
+                f"Someone is interested in your:\n"
+                f"🏠 {re_listing.property_type} in {re_listing.district}, {re_listing.city}\n"
+                f"💶 €{re_listing.price:,.0f}\n\n"
+                f"They may contact you soon!"
+            )
+
+        else:
+            return
 
         await bot.send_message(chat_id=chat_id, text=message)
         app_log.info(f"Seller notification sent for match {data['match_id']}")
 
-    # Rate limiting
     await asyncio.sleep(RATE_LIMIT_DELAY)
 
 
@@ -119,7 +183,6 @@ async def main():
 
     app_log.info("Notification consumer started")
 
-    # Start both consumers concurrently
     await asyncio.gather(
         rabbitmq.consume_buyer_notifications(send_buyer_notification),
         rabbitmq.consume_seller_notifications(send_seller_notification),

@@ -9,15 +9,35 @@ from src.infrastructure.utils.logs import app_log
 
 MATCHES_PER_PAGE = 20
 
+def get_delete_label(request) -> str:
+    d = request.details
+    if request.type == "car":
+        return f"❌ Delete {d.get('make', '')} {d.get('model', '')}"
+    elif request.type == "real_estate":
+        types = ", ".join(d.get("property_type", []))
+        return f"❌ Delete {types} in {d.get('city', '')}"
+    return "❌ Delete Request"
 
 def format_request_line(request, index: int, match_count: int = 0) -> str:
     d = request.details
-    year_range = f"{d.get('year_min', 'N/A')} — {d.get('year_max', 'N/A')}"
     match_indicator = f" ({match_count} matches)" if match_count > 0 else ""
-    return (
-        f"{index}️⃣ {d.get('make', 'N/A')} {d.get('model', 'N/A')} "
-        f"— {year_range}{match_indicator}"
-    )
+
+    if request.type == "car":
+        year_range = f"{d.get('year_min', 'N/A')} — {d.get('year_max', 'N/A')}"
+        return (
+            f"{index}️⃣ 🚗 {d.get('make', 'N/A')} {d.get('model', 'N/A')} "
+            f"— {year_range}{match_indicator}"
+        )
+    elif request.type == "real_estate":
+        price_range = f"€{d.get('min_price', 0):,.0f} — €{d.get('max_price', 0):,.0f}"
+        property_types = ", ".join(d.get("property_type", ["N/A"]))
+        city = d.get("city", "N/A")
+        return (
+            f"{index}️⃣ 🏠 {property_types} in {city} "
+            f"— {price_range}{match_indicator}"
+        )
+    else:
+        return f"{index}️⃣ Unknown request type{match_indicator}"
 
 
 # ================= SHOW REQUESTS =================
@@ -56,7 +76,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
             match_counts[str(r.id)] = count
 
     # Build message text - CHANGED: Show request count with limit
-    lines = [f"📄 Your Car Requests ({len(requests)}/{max_requests}):\n"]
+    lines = [f"📄 Your Requests ({len(requests)}/{max_requests}):\n"]
     for i, r in enumerate(requests):
         lines.append(format_request_line(r, i + 1, match_counts[str(r.id)]))
 
@@ -68,7 +88,7 @@ async def show_profile(update: Update, context: ContextTypes.DEFAULT_TYPE):
         
         # Delete button
         row.append(InlineKeyboardButton(
-            f"❌ Delete {d.get('make', '')} {d.get('model', '')}",
+            get_delete_label(r),
             callback_data=f"delete_request:{r.id}"
         ))
         
@@ -149,7 +169,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
                 match_counts[str(r.id)] = count
 
         # Rebuild the list - CHANGED: Show updated count
-        lines = [f"📄 Your Car Requests ({len(requests)}/{max_requests}):\n"]
+        lines = [f"📄 Your Requests ({len(requests)}/{max_requests}):\n"]
         for i, r in enumerate(requests):
             lines.append(format_request_line(r, i + 1, match_counts[str(r.id)]))
 
@@ -158,7 +178,7 @@ async def handle_confirm_delete(update: Update, context: ContextTypes.DEFAULT_TY
             d = r.details
             row = []
             row.append(InlineKeyboardButton(
-                f"❌ Delete {d.get('make', '')} {d.get('model', '')}",
+                get_delete_label(r),
                 callback_data=f"delete_request:{r.id}"
             ))
             count = match_counts[str(r.id)]
@@ -428,7 +448,7 @@ async def handle_back_to_requests(update: Update, context: ContextTypes.DEFAULT_
             match_counts[str(r.id)] = count
 
     # CHANGED: Show request count with limit
-    lines = [f"📄 Your Car Requests ({len(requests)}/{max_requests}):\n"]
+    lines = [f"📄 Your Requests ({len(requests)}/{max_requests}):\n"]
     for i, r in enumerate(requests):
         lines.append(format_request_line(r, i + 1, match_counts[str(r.id)]))
 
@@ -437,7 +457,7 @@ async def handle_back_to_requests(update: Update, context: ContextTypes.DEFAULT_
         d = r.details
         row = []
         row.append(InlineKeyboardButton(
-            f"❌ Delete {d.get('make', '')} {d.get('model', '')}",
+            get_delete_label(r),
             callback_data=f"delete_request:{r.id}"
         ))
         count = match_counts[str(r.id)]

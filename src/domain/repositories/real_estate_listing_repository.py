@@ -32,3 +32,4 @@ class RealEstateListingRepository(ABC):
     async def delete_listings(self, listing_ids: Union[UUID, List[UUID]]) -> None:
         """Delete single or multiple listings."""
         pass
+    

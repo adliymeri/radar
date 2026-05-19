@@ -1,4 +1,6 @@
 from typing import Dict
+from src.application.services.real_estate_listing_service import RealEstateListingService
+from src.infrastructure.repositories.postgres_real_estate_listing_repository import PostgresRealEstateListingRepository
 from src.application.services.car_listing_service import CarListingService
 from src.application.services.listing_service import ListingService
 from src.infrastructure.repositories.postgres_car_listing_repository import PostgresCarListingRepository
@@ -38,6 +40,7 @@ class BotDependencyManager:
         listing_repo = PostgresListingRepository(self.session)
         car_listing_repo = PostgresCarListingRepository(self.session)
         match_repo = PostgresMatchRepository(self.session)
+        real_estate_listing_repo = PostgresRealEstateListingRepository(self.session)
         
 
         # 3. Initialize Services
@@ -47,6 +50,7 @@ class BotDependencyManager:
         listing_service = ListingService(listing_repo)
         car_listing_service = CarListingService(car_listing_repo)
         matching_service = MatchingService(self.session, match_repo)
+        real_estate_listing_service = RealEstateListingService(real_estate_listing_repo)
         
 
         
@@ -56,6 +60,7 @@ class BotDependencyManager:
             "buyer_request_service": buyer_request_service,
             "listing_service": listing_service,
             "car_listing_service": car_listing_service,
+            "real_estate_listing_service": real_estate_listing_service,
             "matching_service": matching_service,
         }
 

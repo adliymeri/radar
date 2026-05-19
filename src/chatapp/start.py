@@ -1,5 +1,8 @@
 import os
-from telegram.ext import ApplicationBuilder
+from telegram.ext import ApplicationBuilder, PicklePersistence, MessageHandler, CommandHandler, filters
+from src.chatapp.handlers.seller.seller_real_estate_listing_handler import get_seller_real_estate_listing_conv
+from src.chatapp.handlers.fallback_handler import handle_lost_user
+from src.chatapp.handlers.buyer.buyer_real_estate_handler import get_real_estate_request_conv
 from src.chatapp.handlers.help_handler import get_help_handler
 from src.chatapp.handlers.seller.seller_settings_handler import get_seller_settings_conv
 from src.chatapp.handlers.seller.seller_listings_handler import get_seller_listings_handler
@@ -22,7 +25,8 @@ def main():
         app_log.critical("Missing TELEGRAM_BOT_TOKEN!")
         return
 
-    application = ApplicationBuilder().token(token).build()
+    persistence = PicklePersistence(filepath="bot_data.pickle")
+    application = ApplicationBuilder().token(token).persistence(persistence).build()
 
     application.add_handler(get_registration_conv())
     application.add_handler(get_car_request_conv())
@@ -30,7 +34,9 @@ def main():
     application.add_handler(get_contact_seller_handler())
     application.add_handler(get_seller_settings_conv())
     application.add_handler(get_help_handler())
-    
+    application.add_handler(get_real_estate_request_conv())
+    application.add_handler(get_seller_real_estate_listing_conv())
+
     
     for handler in get_buyer_profile_handler():
         application.add_handler(handler)
@@ -40,6 +46,8 @@ def main():
 
     for handler in get_seller_listings_handler():
         application.add_handler(handler)
+
+    application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_lost_user))
 
     try:
         application.run_polling()

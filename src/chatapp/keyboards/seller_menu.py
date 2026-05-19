@@ -2,7 +2,7 @@ from telegram import ReplyKeyboardMarkup
 
 def get_seller_menu_keyboard():
     keyboard = [
-        ["🚗 Post a Car"],
+        ["🚗 Post a Car", "🏠 Post Real Estate"],
         ["📋 My Listings"],
         ["⚙️ Settings", "❓ Help"],
     ]

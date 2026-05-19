@@ -255,5 +255,7 @@ def get_registration_conv():
         fallbacks=[
             CommandHandler("cancel", lambda u, c: ConversationHandler.END)
         ],
-        allow_reentry=True
+        allow_reentry=True,
+        persistent=True,
+        name="registration",
     )

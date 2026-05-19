@@ -207,4 +207,6 @@ def get_seller_settings_conv():
         fallbacks=[
             MessageHandler(filters.Regex("^❌ Cancel$"), cancel_settings),
         ],
+        persistent=True,
+        name="settings",
     )
