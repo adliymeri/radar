@@ -1,5 +1,6 @@
 from telegram import Update, ReplyKeyboardMarkup, ReplyKeyboardRemove
 from telegram.ext import ContextTypes, ConversationHandler, MessageHandler, CommandHandler, filters
+from src.domain.config.limits import get_max_listings_for_seller
 from src.chatapp.handlers.seller.seller_error_handler import error_exit
 from src.chatapp.handlers.seller.seller_cancel_handler import cancel_handler
 from src.chatapp.keyboards.seller_menu import get_seller_menu_keyboard
@@ -43,6 +44,30 @@ def with_cancel(keyboard: list) -> list:
 # ================= START =================
 
 async def start_real_estate_listing(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_user.id)
+
+    async with get_bot_deps() as deps:
+        seller_service = deps["seller_service"]
+        listing_service = deps["listing_service"]
+
+        seller = await seller_service.get_seller_by_chat_id(chat_id)
+        if not seller:
+            await update.message.reply_text("⚠️ You need to register first. Use /start.")
+            return ConversationHandler.END
+
+        max_listings = get_max_listings_for_seller(seller.payment)
+        existing_listings = await listing_service.get_listings_by_seller(seller.id)
+
+        if len(existing_listings) >= max_listings:
+            plan = seller.payment.get("plan", "free") if seller.payment else "free"
+            await update.message.reply_text(
+                f"⚠️ You've reached the maximum of {max_listings} active listings for your {plan} plan.\n\n"
+                f"Delete an existing listing from 📋 My Listings to add a new one, "
+                f"or upgrade your plan for more listings.",
+                reply_markup=get_seller_menu_keyboard()
+            )
+            return ConversationHandler.END
+
     context.user_data["listing"] = {}
     context.user_data["photos"] = []
 

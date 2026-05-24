@@ -47,10 +47,10 @@ async def show_buyer_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 📖 **How Radar Works for Buyers**
 
 **Create Requests:**
-Tell us what car you're looking for - make, model, year range, price range, mileage, and more.
+Tell us what you're looking for — a car or a property. Set your criteria like price range, location, features, and more.
 
 **Get Matched:**
-When a seller lists a car that matches your criteria, we'll notify you instantly.
+When a seller lists something that matches your criteria, we'll notify you instantly.
 
 **Contact Sellers:**
 View match details and contact sellers directly via Telegram.
@@ -61,7 +61,8 @@ View match details and contact sellers directly via Telegram.
 - Delete old requests to add new ones
 
 **Commands:**
-🚗 Request a Car - Create a new search
+🚗 Request a Car - Search for cars
+🏠 Request Real Estate - Search for properties
 📄 My Requests - Manage your requests
 ❓ Help - Show this message
 
@@ -72,7 +73,7 @@ View match details and contact sellers directly via Telegram.
 
 {format_support_text()}
 """
-    
+
     await update.message.reply_text(
         help_text,
         reply_markup=get_buyer_menu_keyboard(),
@@ -83,41 +84,42 @@ async def show_seller_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = f"""
 📖 **How Radar Works for Sellers**
 
-**List Your Cars:**
-Post your cars with photos, price, details, and location. Buyers searching for matching cars get notified instantly.
+**List Your Cars & Properties:**
+Post your cars or real estate with photos, price, details, and location. Buyers searching for matching listings get notified instantly.
 
 **Get Matched Automatically:**
-When your car matches a buyer's search criteria, they receive a notification and can contact you directly.
+When your listing matches a buyer's search criteria, they receive a notification and can contact you directly.
 
 **Manage Your Listings:**
-- View all your active listings
-- Delete sold cars anytime
+- Free plan: 5 active listings
+- Premium plan: 50 active listings
+- Delete sold items anytime
 - Update contact info in Settings
 
 **How Buyers Contact You:**
 Buyers see your Telegram handle and phone number when interested. They can message you directly via Telegram or call.
 
 **Tips for Success:**
-✓ Add clear photos (up to 10 per car)
+✓ Add clear photos (up to 10 per listing)
 ✓ Price competitively for your market
 ✓ Keep your contact info up to date
 ✓ Respond to buyer inquiries quickly
-✓ Delete listings once cars are sold
+✓ Delete listings once sold or rented
 
 **Commands:**
-🚗 Post a Car - Add a new listing
-📋 My Listings - View and manage your cars
+🚗 Post a Car - Add a car listing
+🏠 Post Real Estate - Add a property listing
+📋 My Listings - View and manage your listings
 ⚙️ Settings - Update phone/website
 ❓ Help - Show this message
 
 {format_support_text()}
 """
-    
+
     await update.message.reply_text(
         help_text,
         reply_markup=get_seller_menu_keyboard(),
     )
-
-
+    
 def get_help_handler():
     return MessageHandler(filters.Regex("^❓ Help$"), show_help)

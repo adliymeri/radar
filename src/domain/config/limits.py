@@ -35,3 +35,23 @@ def get_max_requests_for_buyer(payment_info: dict) -> int:
     plan = payment_info.get("plan", DEFAULT_PLAN)
     
     return limits.get(plan, limits[DEFAULT_PLAN])
+
+def get_listing_limits() -> Dict[str, int]:
+    """Get listing limits from environment variables"""
+    return {
+        "free": int(os.getenv("MAX_LISTINGS_FREE", "5")),
+        "basic": int(os.getenv("MAX_LISTINGS_BASIC", "15")),
+        "premium": int(os.getenv("MAX_LISTINGS_PREMIUM", "50")),
+        "enterprise": int(os.getenv("MAX_LISTINGS_ENTERPRISE", "999")),
+    }
+
+
+def get_max_listings_for_seller(payment_info: dict) -> int:
+    """Get max listings for a seller based on their payment plan."""
+    limits = get_listing_limits()
+
+    if not payment_info:
+        return limits[DEFAULT_PLAN]
+
+    plan = payment_info.get("plan", DEFAULT_PLAN)
+    return limits.get(plan, limits[DEFAULT_PLAN])

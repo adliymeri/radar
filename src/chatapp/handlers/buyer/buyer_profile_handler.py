@@ -217,20 +217,16 @@ async def handle_show_matches(update: Update, context: ContextTypes.DEFAULT_TYPE
     async with get_bot_deps() as deps:
         request_service = deps["buyer_request_service"]
         matching_service = deps["matching_service"]
-        listing_service = deps["listing_service"]
-        car_listing_service = deps["car_listing_service"]
 
-        # Get request details
         buyer_request = await request_service.get_request_by_id(request_id)
         if not buyer_request:
             await query.edit_message_text("⚠️ Request not found.")
             return
 
-        # Get total count and matches
         total_count = await matching_service.count_matches_by_request(request_id)
         matches = await matching_service.get_matches_by_request(
-            request_id, 
-            limit=MATCHES_PER_PAGE, 
+            request_id,
+            limit=MATCHES_PER_PAGE,
             offset=offset
         )
 
@@ -238,37 +234,44 @@ async def handle_show_matches(update: Update, context: ContextTypes.DEFAULT_TYPE
         await query.edit_message_text("No matches found for this request.")
         return
 
-    # Build message
     d = buyer_request.details
-    lines = [
-        f"📨 Matches for: {d.get('make')} {d.get('model')} ({d.get('year_min')}-{d.get('year_max')})\n",
-        f"Found {total_count} match(es):\n"
-    ]
+    if buyer_request.type == "car":
+        header = f"📨 Matches for: 🚗 {d.get('make')} {d.get('model')} ({d.get('year_min')}-{d.get('year_max')})"
+    elif buyer_request.type == "real_estate":
+        types = ", ".join(d.get("property_type", []))
+        header = f"📨 Matches for: 🏠 {types} in {d.get('city', '')}"
+    else:
+        header = "📨 Matches"
 
-    # Fetch car listing details for all matches
+    lines = [header + "\n", f"Found {total_count} match(es):\n"]
+
     keyboard = []
     for i, match in enumerate(matches):
         async with get_bot_deps() as deps:
-            car_listing_service = deps["car_listing_service"]
-            car_listing = await car_listing_service.get_car_listing_by_id(match.listing_id)
+            if buyer_request.type == "car":
+                detail = await deps["car_listing_service"].get_car_listing_by_id(match.listing_id)
+                if not detail:
+                    continue
+                status_icon = "✅" if match.status == "contacted" else "🔔"
+                lines.append(
+                    f"{status_icon} {detail.make} {detail.model} ({detail.year}) — €{detail.price:,.0f}\n"
+                    f"   📍 {detail.location or 'N/A'} | {detail.mileage:,} km | {detail.transmission}"
+                )
+            elif buyer_request.type == "real_estate":
+                detail = await deps["real_estate_listing_service"].get_listing_by_id(match.listing_id)
+                if not detail:
+                    continue
+                status_icon = "✅" if match.status == "contacted" else "🔔"
+                lines.append(
+                    f"{status_icon} {detail.property_type} in {detail.district}, {detail.city} — €{detail.price:,.0f}\n"
+                    f"   📐 {detail.area:.0f} m² | 🛏 {detail.bedrooms} bed | 🏢 Floor {detail.floor}"
+                )
 
-        if not car_listing:
-            continue
-
-        # Build match summary
-        status_icon = "✅" if match.status == "contacted" else "🔔"
-        lines.append(
-            f"{status_icon} {car_listing.make} {car_listing.model} ({car_listing.year}) — €{car_listing.price:,.0f}\n"
-            f"   📍 {car_listing.location or 'N/A'} | {car_listing.mileage:,} km | {car_listing.transmission}"
-        )
-
-        # Add view button
         keyboard.append([InlineKeyboardButton(
             f"👁 View Match #{offset + i + 1}",
             callback_data=f"view_match:{match.id}"
         )])
 
-    # Add pagination if needed
     pagination_row = []
     if offset > 0:
         pagination_row.append(InlineKeyboardButton(
@@ -283,15 +286,12 @@ async def handle_show_matches(update: Update, context: ContextTypes.DEFAULT_TYPE
     if pagination_row:
         keyboard.append(pagination_row)
 
-    # Back button
     keyboard.append([InlineKeyboardButton("🔙 Back to Requests", callback_data="back_to_requests")])
 
     await query.edit_message_text(
         "\n".join(lines),
         reply_markup=InlineKeyboardMarkup(keyboard),
     )
-
-
 # ================= VIEW SINGLE MATCH DETAILS =================
 
 async def handle_view_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -302,7 +302,7 @@ async def handle_view_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     async with get_bot_deps() as deps:
         matching_service = deps["matching_service"]
-        car_listing_service = deps["car_listing_service"]
+        listing_service = deps["listing_service"]
         seller_service = deps["seller_service"]
 
         match = await matching_service.get_match_by_id(match_id)
@@ -310,27 +310,68 @@ async def handle_view_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("⚠️ Match not found.")
             return
 
-        car_listing = await car_listing_service.get_car_listing_by_id(match.listing_id)
+        listing = await listing_service.get_listing_by_id(match.listing_id)
         seller = await seller_service.get_seller_by_id(match.seller_id)
 
-    if not car_listing or not seller:
-        await query.edit_message_text("⚠️ Listing details not available.")
-        return
+        if not listing or not seller:
+            await query.edit_message_text("⚠️ Listing details not available.")
+            return
 
-    # Build detailed message
-    message_lines = [
-        f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})",
-        f"💶 €{car_listing.price:,.0f}",
-        f"🛣 {car_listing.mileage:,} km",
-        f"📍 {car_listing.location or 'Location not specified'}",
-        f"⚙️ {car_listing.transmission} | {car_listing.fuel_type} | {car_listing.drivetrain}",
-    ]
+        if listing.type == "car":
+            detail = await deps["car_listing_service"].get_car_listing_by_id(match.listing_id)
+            if not detail:
+                await query.edit_message_text("⚠️ Listing details not available.")
+                return
 
-    if car_listing.description:
-        desc = car_listing.description[:200] + "..." if len(car_listing.description) > 200 else car_listing.description
-        message_lines.append(f"\n📝 {desc}")
+            message_lines = [
+                f"🚗 {detail.make} {detail.model} ({detail.year})",
+                f"💶 €{detail.price:,.0f}",
+                f"🛣 {detail.mileage:,} km",
+                f"📍 {detail.location or 'Location not specified'}",
+                f"⚙️ {detail.transmission} | {detail.fuel_type} | {detail.drivetrain}",
+            ]
+            if detail.description:
+                desc = detail.description[:200] + "..." if len(detail.description) > 200 else detail.description
+                message_lines.append(f"\n📝 {desc}")
+            photos = detail.photos
 
-    # If already contacted, show seller details directly
+        elif listing.type == "real_estate":
+            detail = await deps["real_estate_listing_service"].get_listing_by_id(match.listing_id)
+            if not detail:
+                await query.edit_message_text("⚠️ Listing details not available.")
+                return
+
+            features = []
+            if detail.parking:
+                features.append("🅿️ Parking")
+            if detail.elevator:
+                features.append("🛗 Elevator")
+            if detail.furnished:
+                features.append("🛋 Furnished")
+            if detail.balcony:
+                features.append("🏞 Balcony")
+
+            message_lines = [
+                f"🏠 {detail.property_type} — {detail.listing_type}",
+                f"🏗 {detail.condition}",
+                f"📍 {detail.district}, {detail.city}",
+                f"📫 {detail.address}",
+                f"💶 €{detail.price:,.0f}",
+                f"📐 {detail.area:.0f} m²",
+                f"🛏 {detail.bedrooms} bedrooms | 🚿 {detail.bathrooms} bathrooms",
+                f"🏢 Floor {detail.floor}",
+            ]
+            if features:
+                message_lines.append(f"✅ {', '.join(features)}")
+            if detail.description:
+                desc = detail.description[:200] + "..." if len(detail.description) > 200 else detail.description
+                message_lines.append(f"\n📝 {desc}")
+            photos = detail.photos
+
+        else:
+            await query.edit_message_text("⚠️ Unknown listing type.")
+            return
+
     if match.status == "contacted":
         seller_handle = seller.details.get("telegram_handle", "N/A")
         seller_phone = seller.details.get("mobile_phone", "Not shared")
@@ -342,7 +383,6 @@ async def handle_view_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     message = "\n".join(message_lines)
 
-    # Build keyboard
     keyboard = []
     if match.status != "contacted":
         keyboard.append([InlineKeyboardButton("📞 Contact Seller", callback_data=f"contact_seller:{match_id}")])
@@ -350,15 +390,12 @@ async def handle_view_match(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard))
 
-    # Send photos if available (separate message because Telegram doesn't support photos + inline keyboard)
-    if car_listing.photos and len(car_listing.photos) > 0:
+    if photos and len(photos) > 0:
         try:
-            if len(car_listing.photos) == 1:
-                # Single photo
-                await query.message.reply_photo(photo=car_listing.photos[0])
+            if len(photos) == 1:
+                await query.message.reply_photo(photo=photos[0])
             else:
-                # Multiple photos - use media group (max 10)
-                media_group = [InputMediaPhoto(media=photo_id) for photo_id in car_listing.photos[:10]]
+                media_group = [InputMediaPhoto(media=photo_id) for photo_id in photos[:10]]
                 await query.message.reply_media_group(media=media_group)
         except Exception as e:
             app_log.error(f"Error sending photos: {e}")
@@ -374,35 +411,73 @@ async def handle_contact_seller(update: Update, context: ContextTypes.DEFAULT_TY
     async with get_bot_deps() as deps:
         matching_service = deps["matching_service"]
         seller_service = deps["seller_service"]
-        car_listing_service = deps["car_listing_service"]
+        listing_service = deps["listing_service"]
 
-        # Mark as contacted
         await matching_service.mark_as_contacted(match_id)
 
-        # Get details
         match = await matching_service.get_match_by_id(match_id)
         seller = await seller_service.get_seller_by_id(match.seller_id)
-        car_listing = await car_listing_service.get_car_listing_by_id(match.listing_id)
+        listing = await listing_service.get_listing_by_id(match.listing_id)
 
-    if not match or not seller or not car_listing:
-        await query.edit_message_text("⚠️ Could not retrieve details.")
-        return
+        if not match or not seller or not listing:
+            await query.edit_message_text("⚠️ Could not retrieve details.")
+            return
 
-    # Update message to show seller contact info
+        if listing.type == "car":
+            detail = await deps["car_listing_service"].get_car_listing_by_id(match.listing_id)
+            if not detail:
+                await query.edit_message_text("⚠️ Could not retrieve details.")
+                return
+
+            message_lines = [
+                f"🚗 {detail.make} {detail.model} ({detail.year})",
+                f"💶 €{detail.price:,.0f}",
+                f"🛣 {detail.mileage:,} km",
+                f"📍 {detail.location or 'Location not specified'}",
+                f"⚙️ {detail.transmission} | {detail.fuel_type} | {detail.drivetrain}",
+            ]
+            if detail.description:
+                desc = detail.description[:200] + "..." if len(detail.description) > 200 else detail.description
+                message_lines.append(f"\n📝 {desc}")
+
+        elif listing.type == "real_estate":
+            detail = await deps["real_estate_listing_service"].get_listing_by_id(match.listing_id)
+            if not detail:
+                await query.edit_message_text("⚠️ Could not retrieve details.")
+                return
+
+            features = []
+            if detail.parking:
+                features.append("🅿️ Parking")
+            if detail.elevator:
+                features.append("🛗 Elevator")
+            if detail.furnished:
+                features.append("🛋 Furnished")
+            if detail.balcony:
+                features.append("🏞 Balcony")
+
+            message_lines = [
+                f"🏠 {detail.property_type} — {detail.listing_type}",
+                f"🏗 {detail.condition}",
+                f"📍 {detail.district}, {detail.city}",
+                f"📫 {detail.address}",
+                f"💶 €{detail.price:,.0f}",
+                f"📐 {detail.area:.0f} m²",
+                f"🛏 {detail.bedrooms} bedrooms | 🚿 {detail.bathrooms} bathrooms",
+                f"🏢 Floor {detail.floor}",
+            ]
+            if features:
+                message_lines.append(f"✅ {', '.join(features)}")
+            if detail.description:
+                desc = detail.description[:200] + "..." if len(detail.description) > 200 else detail.description
+                message_lines.append(f"\n📝 {desc}")
+
+        else:
+            await query.edit_message_text("⚠️ Unknown listing type.")
+            return
+
     seller_handle = seller.details.get("telegram_handle", "N/A")
     seller_phone = seller.details.get("mobile_phone", "Not shared")
-
-    message_lines = [
-        f"🚗 {car_listing.make} {car_listing.model} ({car_listing.year})",
-        f"💶 €{car_listing.price:,.0f}",
-        f"🛣 {car_listing.mileage:,} km",
-        f"📍 {car_listing.location or 'Location not specified'}",
-        f"⚙️ {car_listing.transmission} | {car_listing.fuel_type} | {car_listing.drivetrain}",
-    ]
-
-    if car_listing.description:
-        desc = car_listing.description[:200] + "..." if len(car_listing.description) > 200 else car_listing.description
-        message_lines.append(f"\n📝 {desc}")
 
     message_lines.extend([
         "\n✅ Seller Contact Information:",
@@ -418,8 +493,6 @@ async def handle_contact_seller(update: Update, context: ContextTypes.DEFAULT_TY
     await query.edit_message_text("\n".join(message_lines), reply_markup=keyboard)
     app_log.info(f"Match {match_id} marked as contacted")
 
-
-# ================= BACK TO REQUESTS =================
 
 # ================= BACK TO REQUESTS =================
 
