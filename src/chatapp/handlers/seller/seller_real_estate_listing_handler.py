@@ -23,15 +23,12 @@ from src.infrastructure.utils.logs import app_log
     SELECT_BATHROOMS,
     SELECT_FLOOR,
     SELECT_PRICE,
-    SELECT_PARKING,
-    SELECT_ELEVATOR,
-    SELECT_FURNISHED,
-    SELECT_BALCONY,
+    SELECT_FEATURES,
     UPLOAD_PHOTOS,
     GET_LINK,
     GET_DESCRIPTION,
     CONFIRM,
-) = range(19)
+) = range(16)
 
 
 CANCEL_ROW = ["❌ Cancel"]
@@ -309,99 +306,78 @@ async def handle_price(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return SELECT_PRICE
 
     context.user_data["listing"]["price"] = value
-    return await ask_parking(update, context)
+    return await ask_features(update, context)
 
 
-# ================= BOOLEAN FILTERS =================
+# ================= FEATURES (multi-select) =================
 
-async def ask_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = with_cancel([["✅ Yes", "❌ No"]])
+FEATURE_OPTIONS = ["🅿️ Parking", "🛗 Elevator", "🛋 Furnished", "🏞 Balcony"]
+FEATURE_KEYS = {
+    "🅿️ Parking": "parking",
+    "🛗 Elevator": "elevator",
+    "🛋 Furnished": "furnished",
+    "🏞 Balcony": "balcony",
+}
+
+DONE_ROW = ["✔️ Done", "❌ Cancel"]
+
+
+def build_multi_select_keyboard(items: list, selected: list) -> list:
+    keyboard = []
+    for i in range(0, len(items), 2):
+        row = []
+        for item in items[i:i+2]:
+            prefix = "✅ " if item in selected else ""
+            row.append(f"{prefix}{item}")
+        keyboard.append(row)
+    keyboard.append(DONE_ROW)
+    return keyboard
+
+
+async def ask_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["selected_features"] = []
+    keyboard = build_multi_select_keyboard(FEATURE_OPTIONS, [])
     await update.message.reply_text(
-        "🅿️ Does it have parking?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
+        "Which features does the property have?\nSelect all that apply, then press Done:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True),
     )
-    return SELECT_PARKING
+    return SELECT_FEATURES
 
 
-async def handle_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text == "✅ Yes":
-        context.user_data["listing"]["parking"] = True
-    elif text == "❌ No":
-        context.user_data["listing"]["parking"] = False
+async def handle_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
+
+    if text == "✔️ Done":
+        selected = context.user_data.get("selected_features", [])
+        # Set selected to True, unselected to False
+        for label, key in FEATURE_KEYS.items():
+            context.user_data["listing"][key] = label in selected
+        context.user_data.pop("selected_features", None)
+
+        await update.message.reply_text(
+            "📸 Send photos of the property one by one.\nPress Done when finished:",
+            reply_markup=ReplyKeyboardMarkup([["✔️ Done", "❌ Cancel"]], resize_keyboard=True, is_persistent=True),
+        )
+        return UPLOAD_PHOTOS
+
+    clean = text.replace("✅ ", "")
+    if clean not in FEATURE_OPTIONS:
+        await update.message.reply_text("Please select from the list.")
+        return SELECT_FEATURES
+
+    selected = context.user_data.setdefault("selected_features", [])
+    if clean in selected:
+        selected.remove(clean)
     else:
-        await update.message.reply_text("Please select Yes or No.")
-        return SELECT_PARKING
-    return await ask_elevator(update, context)
+        selected.append(clean)
 
-
-async def ask_elevator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = with_cancel([["✅ Yes", "❌ No"]])
+    keyboard = build_multi_select_keyboard(FEATURE_OPTIONS, selected)
+    selected_display = ", ".join(selected) if selected else "none"
     await update.message.reply_text(
-        "🛗 Does it have an elevator?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
+        f"Selected: {selected_display}\nTap more or press Done:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True),
     )
-    return SELECT_ELEVATOR
-
-
-async def handle_elevator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text == "✅ Yes":
-        context.user_data["listing"]["elevator"] = True
-    elif text == "❌ No":
-        context.user_data["listing"]["elevator"] = False
-    else:
-        await update.message.reply_text("Please select Yes or No.")
-        return SELECT_ELEVATOR
-    return await ask_furnished(update, context)
-
-
-async def ask_furnished(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = with_cancel([["✅ Yes", "❌ No"]])
-    await update.message.reply_text(
-        "🛋 Is it furnished?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
-    )
-    return SELECT_FURNISHED
-
-
-async def handle_furnished(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text == "✅ Yes":
-        context.user_data["listing"]["furnished"] = True
-    elif text == "❌ No":
-        context.user_data["listing"]["furnished"] = False
-    else:
-        await update.message.reply_text("Please select Yes or No.")
-        return SELECT_FURNISHED
-    return await ask_balcony(update, context)
-
-
-async def ask_balcony(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = with_cancel([["✅ Yes", "❌ No"]])
-    await update.message.reply_text(
-        "🏞 Does it have a balcony?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
-    )
-    return SELECT_BALCONY
-
-
-async def handle_balcony(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-    if text == "✅ Yes":
-        context.user_data["listing"]["balcony"] = True
-    elif text == "❌ No":
-        context.user_data["listing"]["balcony"] = False
-    else:
-        await update.message.reply_text("Please select Yes or No.")
-        return SELECT_BALCONY
-
-    await update.message.reply_text(
-        "📸 Send photos of the property one by one.\nPress Done when finished:",
-        reply_markup=ReplyKeyboardMarkup([["✔️ Done", "❌ Cancel"]], resize_keyboard=True, is_persistent=True),
-    )
-    return UPLOAD_PHOTOS
-
+    return SELECT_FEATURES
 
 # ================= PHOTOS =================
 
@@ -575,10 +551,7 @@ def get_seller_real_estate_listing_conv():
             SELECT_BATHROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_bathrooms)],
             SELECT_FLOOR: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_floor)],
             SELECT_PRICE: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_price)],
-            SELECT_PARKING: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_parking)],
-            SELECT_ELEVATOR: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_elevator)],
-            SELECT_FURNISHED: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_furnished)],
-            SELECT_BALCONY: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_balcony)],
+            SELECT_FEATURES: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_features)],
             UPLOAD_PHOTOS: [
                 MessageHandler(filters.PHOTO, handle_photo),
                 MessageHandler(done_filter, handle_photo),

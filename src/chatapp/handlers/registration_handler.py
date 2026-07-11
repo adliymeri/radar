@@ -28,22 +28,62 @@ from src.infrastructure.utils.logs import app_log
 # ==================== START ====================
 
 async def start_cmd(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    chat_id = str(update.effective_user.id)
+
+    async with get_bot_deps() as deps:
+        buyer_service = deps["buyer_service"]
+        seller_service = deps["seller_service"]
+
+        buyer = await buyer_service.get_buyer_by_chat_id(chat_id)
+        seller = await seller_service.get_seller_by_chat_id(chat_id)
+
+    if buyer and seller:
+        role = context.user_data.get("current_role", "buyer")
+        if role == "seller":
+            await update.message.reply_text("Welcome back!", reply_markup=get_seller_menu_keyboard())
+        else:
+            await update.message.reply_text("Welcome back!", reply_markup=get_buyer_menu_keyboard())
+        return ConversationHandler.END
+
+    if buyer and not seller:
+        reply_keyboard = [["Register as Seller", "Continue as Buyer"]]
+        await update.message.reply_text(
+            "Would you like to register as a seller?",
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True),
+        )
+        return CHOOSING_ROLE
+
+    if seller and not buyer:
+        reply_keyboard = [["Register as Buyer", "Continue as Seller"]]
+        await update.message.reply_text(
+            "Would you like to register as a buyer?",
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True),
+        )
+        return CHOOSING_ROLE
+
     reply_keyboard = [["Register as Buyer", "Register as Seller"]]
     await update.message.reply_text(
         "Welcome to Radar! 📡\nPlease choose your role to begin:",
-        reply_markup=ReplyKeyboardMarkup(
-            reply_keyboard, one_time_keyboard=True, resize_keyboard=True, is_persistent=True
-        ),
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True, is_persistent=True),
     )
     return CHOOSING_ROLE
-
-
 # ==================== ROLE ====================
 
 async def choose_role(update: Update, context: ContextTypes.DEFAULT_TYPE):
     choice = update.message.text
+
+    if choice == "Continue as Buyer":
+        context.user_data["current_role"] = "buyer"
+        await update.message.reply_text("Welcome back!", reply_markup=get_buyer_menu_keyboard())
+        return ConversationHandler.END
+
+    if choice == "Continue as Seller":
+        context.user_data["current_role"] = "seller"
+        await update.message.reply_text("Welcome back!", reply_markup=get_seller_menu_keyboard())
+        return ConversationHandler.END
+
     if choice not in ["Register as Buyer", "Register as Seller"]:
-        await update.message.reply_text("⚠️ Please use the buttons to choose your role.")
+        await update.message.reply_text("⚠️ Please use the buttons to choose.")
         return CHOOSING_ROLE
 
     context.user_data["role"] = "buyer" if choice == "Register as Buyer" else "seller"
@@ -234,10 +274,10 @@ def get_registration_conv():
         states={
             CHOOSING_ROLE: [
                 MessageHandler(
-                    filters.Regex("^(Register as Buyer|Register as Seller)$"),
+                    filters.Regex("^(Register as Buyer|Register as Seller|Continue as Buyer|Continue as Seller)$"),
                     choose_role
                 ),
-                MessageHandler(filters.TEXT & ~filters.COMMAND, invalid_role),  # Fixed
+                MessageHandler(filters.TEXT & ~filters.COMMAND, invalid_role),
             ],
             GET_NAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_name)],
             GET_SURNAME: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_surname)],

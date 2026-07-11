@@ -6,6 +6,6 @@ def get_buyer_menu_keyboard(is_paused: bool = False):
     keyboard = [
         ["🚗 Request a Car", "🏠 Request Real Estate"],
         ["📄 My Requests", matching_button],
-        ["❓ Help"]
+        ["❓ Help", "🔄 Switch to Seller"],
     ]
     return ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True)

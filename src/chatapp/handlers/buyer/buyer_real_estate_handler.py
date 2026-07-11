@@ -22,14 +22,11 @@ from src.domain.models.buyer_request import BuyerRequest
     SELECT_MAX_AREA,
     SELECT_MIN_BEDROOMS,
     SELECT_MAX_BEDROOMS,
-    SELECT_PARKING,
-    SELECT_ELEVATOR,
-    SELECT_FURNISHED,
-    SELECT_BALCONY,
+    SELECT_FEATURES,
     SELECT_MIN_FLOOR,
     SELECT_MAX_FLOOR,
     CONFIRM,
-) = range(18)
+) = range(15)
 
 
 CANCEL_ROW = ["❌ Cancel"]
@@ -386,7 +383,7 @@ async def handle_min_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE
     if text == "⏭ Skip":
         context.user_data["request"]["min_bedrooms"] = None
         context.user_data["request"]["max_bedrooms"] = None
-        return await ask_parking(update, context)
+        return await ask_features(update, context)
 
     cleaned = text.replace("+", "")
     if not cleaned.isdigit():
@@ -429,114 +426,69 @@ async def handle_max_bedrooms(update: Update, context: ContextTypes.DEFAULT_TYPE
         return SELECT_MAX_BEDROOMS
 
     context.user_data["request"]["max_bedrooms"] = value
-    return await ask_parking(update, context)
+    return await ask_features(update, context)
 
 
-# ================= BOOLEAN FILTERS =================
+# ================= FEATURES (multi-select) =================
 
-async def ask_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["✅ Yes", "⏭ Skip"],
-        CANCEL_ROW,
-    ]
+FEATURE_OPTIONS = ["🅿️ Parking", "🛗 Elevator", "🛋 Furnished", "🏞 Balcony"]
+FEATURE_KEYS = {
+    "🅿️ Parking": "parking",
+    "🛗 Elevator": "elevator",
+    "🛋 Furnished": "furnished",
+    "🏞 Balcony": "balcony",
+}
+
+
+async def ask_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    context.user_data["selected_features"] = []
+    keyboard = build_multi_select_keyboard(FEATURE_OPTIONS, [])
+    keyboard.append(["⏭ Skip"])
     await update.message.reply_text(
-        "🅿️ Must have parking?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
+        "Which features are important to you?\nSelect one or more, then press Done.\nOr skip if you don't care:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True),
     )
-    return SELECT_PARKING
+    return SELECT_FEATURES
 
 
-async def handle_parking(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
+async def handle_features(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    text = update.message.text
 
     if text == "⏭ Skip":
         context.user_data["request"]["parking"] = None
-    elif text == "✅ Yes":
-        context.user_data["request"]["parking"] = True
-    else:
-        await update.message.reply_text("Please select from the list.")
-        return SELECT_PARKING
-
-    return await ask_elevator(update, context)
-
-
-async def ask_elevator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["✅ Yes", "⏭ Skip"],
-        CANCEL_ROW,
-    ]
-    await update.message.reply_text(
-        "🛗 Must have elevator?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
-    )
-    return SELECT_ELEVATOR
-
-
-async def handle_elevator(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-
-    if text == "⏭ Skip":
         context.user_data["request"]["elevator"] = None
-    elif text == "✅ Yes":
-        context.user_data["request"]["elevator"] = True
-    else:
-        await update.message.reply_text("Please select from the list.")
-        return SELECT_ELEVATOR
-
-    return await ask_furnished(update, context)
-
-
-async def ask_furnished(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["✅ Yes", "⏭ Skip"],
-        CANCEL_ROW,
-    ]
-    await update.message.reply_text(
-        "🛋 Must be furnished?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
-    )
-    return SELECT_FURNISHED
-
-
-async def handle_furnished(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-
-    if text == "⏭ Skip":
         context.user_data["request"]["furnished"] = None
-    elif text == "✅ Yes":
-        context.user_data["request"]["furnished"] = True
-    else:
-        await update.message.reply_text("Please select from the list.")
-        return SELECT_FURNISHED
-
-    return await ask_balcony(update, context)
-
-
-async def ask_balcony(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    keyboard = [
-        ["✅ Yes", "⏭ Skip"],
-        CANCEL_ROW,
-    ]
-    await update.message.reply_text(
-        "🏞 Must have balcony?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
-    )
-    return SELECT_BALCONY
-
-
-async def handle_balcony(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    text = update.message.text.strip()
-
-    if text == "⏭ Skip":
         context.user_data["request"]["balcony"] = None
-    elif text == "✅ Yes":
-        context.user_data["request"]["balcony"] = True
-    else:
+        context.user_data.pop("selected_features", None)
+        return await ask_min_floor(update, context)
+
+    if text == "✔️ Done":
+        selected = context.user_data.get("selected_features", [])
+        # Set selected features to True, unselected to None
+        for label, key in FEATURE_KEYS.items():
+            context.user_data["request"][key] = True if label in selected else None
+        context.user_data.pop("selected_features", None)
+        return await ask_min_floor(update, context)
+
+    clean = text.replace("✅ ", "")
+    if clean not in FEATURE_OPTIONS:
         await update.message.reply_text("Please select from the list.")
-        return SELECT_BALCONY
+        return SELECT_FEATURES
 
-    return await ask_min_floor(update, context)
+    selected = context.user_data.setdefault("selected_features", [])
+    if clean in selected:
+        selected.remove(clean)
+    else:
+        selected.append(clean)
 
+    keyboard = build_multi_select_keyboard(FEATURE_OPTIONS, selected)
+    keyboard.append(["⏭ Skip"])
+    selected_display = ", ".join(selected) if selected else "none"
+    await update.message.reply_text(
+        f"Selected: {selected_display}\nTap more or press Done:",
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True),
+    )
+    return SELECT_FEATURES
 # ================= FLOOR =================
 
 async def ask_min_floor(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -619,9 +571,6 @@ async def show_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.get("min_area") is not None:
         summary += f"📐 {data['min_area']:.0f} — {data['max_area']:.0f} m²\n"
 
-    if data.get("min_rooms") is not None:
-        summary += f"🚪 {data['min_rooms']} — {data['max_rooms']} rooms\n"
-
     if data.get("min_bedrooms") is not None:
         summary += f"🛏 {data['min_bedrooms']} — {data['max_bedrooms']} bedrooms\n"
 
@@ -636,18 +585,6 @@ async def show_confirm(update: Update, context: ContextTypes.DEFAULT_TYPE):
         features.append("🏞 Balcony")
     if features:
         summary += f"✅ {', '.join(features)}\n"
-
-    no_features = []
-    if data.get("parking") is False:
-        no_features.append("🅿️ Parking")
-    if data.get("elevator") is False:
-        no_features.append("🛗 Elevator")
-    if data.get("furnished") is False:
-        no_features.append("🛋 Furnished")
-    if data.get("balcony") is False:
-        no_features.append("🏞 Balcony")
-    if no_features:
-        summary += f"❌ {', '.join(no_features)}\n"
 
     if data.get("min_floor") is not None:
         summary += f"🏢 Floor {data['min_floor']} — {data['max_floor']}\n"
@@ -720,10 +657,7 @@ def get_real_estate_request_conv():
             SELECT_MAX_AREA: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_max_area)],
             SELECT_MIN_BEDROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_min_bedrooms)],
             SELECT_MAX_BEDROOMS: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_max_bedrooms)],
-            SELECT_PARKING: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_parking)],
-            SELECT_ELEVATOR: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_elevator)],
-            SELECT_FURNISHED: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_furnished)],
-            SELECT_BALCONY: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_balcony)],
+            SELECT_FEATURES: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_features)],
             SELECT_MIN_FLOOR: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_min_floor)],
             SELECT_MAX_FLOOR: [MessageHandler(filters.TEXT & ~filters.COMMAND & ~cancel_filter, handle_max_floor)],
             CONFIRM: [MessageHandler(filters.TEXT & ~filters.COMMAND, handle_confirm)],

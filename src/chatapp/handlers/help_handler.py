@@ -44,29 +44,29 @@ async def show_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
 async def show_buyer_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = f"""
-📖 **How Radar Works for Buyers**
+📖 How Radar Works for Buyers
 
-**Create Requests:**
+Create Requests:
 Tell us what you're looking for — a car or a property. Set your criteria like price range, location, features, and more.
 
-**Get Matched:**
+Get Matched:
 When a seller lists something that matches your criteria, we'll notify you instantly.
 
-**Contact Sellers:**
+Contact Sellers:
 View match details and contact sellers directly via Telegram.
 
-**Manage Requests:**
+Manage Requests:
 - Free plan: 3 active requests
 - Premium plan: 10 active requests
 - Delete old requests to add new ones
 
-**Commands:**
+Commands:
 🚗 Request a Car - Search for cars
 🏠 Request Real Estate - Search for properties
 📄 My Requests - Manage your requests
 ❓ Help - Show this message
 
-**Tips:**
+Tips:
 ✓ Be specific with your criteria for better matches
 ✓ Check your matches regularly
 ✓ Contact sellers quickly - good deals go fast!
@@ -82,31 +82,31 @@ View match details and contact sellers directly via Telegram.
 
 async def show_seller_help(update: Update, context: ContextTypes.DEFAULT_TYPE):
     help_text = f"""
-📖 **How Radar Works for Sellers**
+📖 How Radar Works for Sellers
 
-**List Your Cars & Properties:**
+List Your Cars & Properties:
 Post your cars or real estate with photos, price, details, and location. Buyers searching for matching listings get notified instantly.
 
-**Get Matched Automatically:**
+Get Matched Automatically:
 When your listing matches a buyer's search criteria, they receive a notification and can contact you directly.
 
-**Manage Your Listings:**
+Manage Your Listings:
 - Free plan: 5 active listings
 - Premium plan: 50 active listings
 - Delete sold items anytime
 - Update contact info in Settings
 
-**How Buyers Contact You:**
+How Buyers Contact You:
 Buyers see your Telegram handle and phone number when interested. They can message you directly via Telegram or call.
 
-**Tips for Success:**
+Tips for Success:
 ✓ Add clear photos (up to 10 per listing)
 ✓ Price competitively for your market
 ✓ Keep your contact info up to date
 ✓ Respond to buyer inquiries quickly
 ✓ Delete listings once sold or rented
 
-**Commands:**
+Commands:
 🚗 Post a Car - Add a car listing
 🏠 Post Real Estate - Add a property listing
 📋 My Listings - View and manage your listings

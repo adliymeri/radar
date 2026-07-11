@@ -113,11 +113,18 @@ async def send_buyer_notification(data: dict):
             [InlineKeyboardButton("📞 Contact Seller", callback_data=f"contact_seller:{data['match_id']}")]
         ])
 
-        await bot.send_message(chat_id=chat_id, text=message, reply_markup=keyboard)
-
+        # Send photos first, then details
         if photos and len(photos) > 0:
-            media_group = [InputMediaPhoto(photo_id) for photo_id in photos[:10]]
-            await bot.send_media_group(chat_id=chat_id, media=media_group)
+            try:
+                if len(photos) == 1:
+                    await bot.send_photo(chat_id=chat_id, photo=photos[0])
+                else:
+                    media_group = [InputMediaPhoto(photo_id) for photo_id in photos[:10]]
+                    await bot.send_media_group(chat_id=chat_id, media=media_group)
+            except Exception as e:
+                app_log.error(f"Error sending photos: {e}")
+
+        await bot.send_message(chat_id=chat_id, text=message, reply_markup=keyboard)
 
         app_log.info(f"Buyer notification sent for match {data['match_id']}")
 

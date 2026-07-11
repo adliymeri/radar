@@ -14,7 +14,7 @@ def format_support_text() -> str:
     """Format support contact info for display"""
     support = get_support_info()
     return f"""
-**Need Help?**
+Need Help?
 📧 Email: {support['email']}
 📱 Phone: {support['phone']}
 💬 Telegram: {support['telegram']}
