@@ -1,5 +1,5 @@
 networks:
-  radar_network:
+  bimmingo_network:
 
 services:
   postgres:
@@ -7,35 +7,116 @@ services:
     environment:
       TZ: "UTC"
       PGTZ: "UTC"
-      POSTGRES_USER: root
-      POSTGRES_PASSWORD: radarapp2025
-      POSTGRES_DB: radar
-    ports:
-      - "5432:5432"
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
     volumes:
       - db_data:/var/lib/postgresql/data
       - ./src/infrastructure/db/migrations:/docker-entrypoint-initdb.d
     networks:
-      - radar_network
+      - bimmingo_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
 
   rabbitmq:
     image: rabbitmq:3.13-management-alpine
     environment:
-      RABBITMQ_DEFAULT_USER: radar
-      RABBITMQ_DEFAULT_PASS: radarapp2025
-    ports:
-      - "5672:5672"
-      - "15672:15672"
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     networks:
-      - radar_network
+      - bimmingo_network
     healthcheck:
       test: ["CMD", "rabbitmq-diagnostics", "ping"]
       interval: 10s
       timeout: 5s
       retries: 5
+    restart: unless-stopped
+
+  chatapp:
+    image: ${DOCKER_IMAGE}:${IMAGE_TAG:-latest}
+    command: python -m src.chatapp.start
+    env_file: .env
+    volumes:
+      - ./logs:/app/logs
+      - bot_data:/app/bot_data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bimmingo_network
+    restart: unless-stopped
+
+  daemon:
+    image: ${DOCKER_IMAGE}:${IMAGE_TAG:-latest}
+    command: python -m src.daemon.start
+    env_file: .env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bimmingo_network
+    restart: unless-stopped
+
+  notification:
+    image: ${DOCKER_IMAGE}:${IMAGE_TAG:-latest}
+    command: python -m src.daemon.notification_consumer
+    env_file: .env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bimmingo_network
+    restart: unless-stopped
+
+  api:
+    image: ${DOCKER_IMAGE}:${IMAGE_TAG:-latest}
+    command: python -m src.api.start
+    env_file: .env
+    volumes:
+      - ./logs:/app/logs
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - bimmingo_network
+    restart: unless-stopped
+
+  caddy:
+    image: caddy:2-alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - bimmingo_network
+    restart: unless-stopped
+    depends_on:
+      - api
 
 volumes:
   db_data:
   rabbitmq_data:
+  bot_data:
+  caddy_data:
+  caddy_config:
