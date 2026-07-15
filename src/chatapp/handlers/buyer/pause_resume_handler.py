@@ -17,14 +17,28 @@ async def pause_matching(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ You need to register first.")
             return
 
-        # Pause all active requests
         requests = await request_service.get_requests_by_buyer(buyer.id)
-        for request in requests:
-            if request.status == "active":
-                request.status = "paused"
-                await request_service.update_request(request)
+        
+        if not requests:
+            await update.message.reply_text(
+                "⚠️ You have no active requests to pause.",
+                reply_markup=get_buyer_menu_keyboard(is_paused=False),
+            )
+            return
 
-        # Detect overall paused status
+        active_requests = [r for r in requests if r.status == "active"]
+        
+        if not active_requests:
+            await update.message.reply_text(
+                "⏸ Matching is already paused.",
+                reply_markup=get_buyer_menu_keyboard(is_paused=True),
+            )
+            return
+
+        for request in active_requests:
+            request.status = "paused"
+            await request_service.update_request(request)
+
         paused = await is_matching_paused(request_service, buyer.id)
 
         await update.message.reply_text(
@@ -45,14 +59,28 @@ async def resume_matching(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await update.message.reply_text("⚠️ You need to register first.")
             return
 
-        # Resume all paused requests
         requests = await request_service.get_requests_by_buyer(buyer.id)
-        for request in requests:
-            if request.status == "paused":
-                request.status = "active"
-                await request_service.update_request(request)
+        
+        if not requests:
+            await update.message.reply_text(
+                "⚠️ You have no requests to resume.",
+                reply_markup=get_buyer_menu_keyboard(is_paused=False),
+            )
+            return
 
-        # Detect overall paused status
+        paused_requests = [r for r in requests if r.status == "paused"]
+        
+        if not paused_requests:
+            await update.message.reply_text(
+                "▶️ Matching is already active.",
+                reply_markup=get_buyer_menu_keyboard(is_paused=False),
+            )
+            return
+
+        for request in paused_requests:
+            request.status = "active"
+            await request_service.update_request(request)
+
         paused = await is_matching_paused(request_service, buyer.id)
 
         await update.message.reply_text(
