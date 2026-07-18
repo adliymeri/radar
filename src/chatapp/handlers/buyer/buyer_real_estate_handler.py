@@ -200,15 +200,13 @@ async def handle_city(update: Update, context: ContextTypes.DEFAULT_TYPE):
         context.user_data["request"]["districts"] = None
         return await ask_min_price(update, context)
 
-    keyboard = []
-    for i in range(0, len(districts), 2):
-        keyboard.append(districts[i:i+2])
-    keyboard.append(["✅ Multiple Districts"])
-    keyboard.append(["⏭ Any District", "❌ Cancel"])
-
+    context.user_data["selected_districts"] = []
+    keyboard = build_multi_select_keyboard(districts, [])
+    keyboard.insert(-1, ["⏭ Any District"])
+    
     await update.message.reply_text(
         f"Which district in {text}?",
-        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, one_time_keyboard=True, is_persistent=True),
+        reply_markup=ReplyKeyboardMarkup(keyboard, resize_keyboard=True, is_persistent=True),
     )
     return SELECT_DISTRICTS
 
